@@ -1,0 +1,28 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# DB connectivity
+sqlalchemy==2.0.35
+pyodbc==5.1.0
+
+# SQL parsing / DDL-DML classification
+sqlparse==0.5.1
+
+# AI review layer
+langchain==0.3.4
+langchain-mistralai==0.2.1
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+
+# Templates
+jinja2==3.1.4
+
+# Env vars / secrets
+python-dotenv==1.0.1
+cryptography==43.0.1
+
+# Postgres driver (for deployed app DB, e.g. on Render)
+psycopg2-binary==2.9.9
