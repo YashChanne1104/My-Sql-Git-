@@ -7,7 +7,8 @@ sqlalchemy==2.0.43
 psycopg2-binary==2.9.10
 pyodbc==5.1.0
 sqlparse==0.5.1
-
+email-validator
+pydantic[email]
 langchain
 langchain-mistralai
 
