@@ -8,6 +8,7 @@ from ..core.config import UAT_DB_URL
 from ..models import models, schemas
 from ..services.classifier import classify_sql
 from ..services.executor import execute_ddl
+from ..services.audit import log_action
 from ..routers.sql_review import run_sql_review
 
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
@@ -19,12 +20,6 @@ def create_submission(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """
-    Developer submits SQL. Classified + AI-reviewed immediately, then saved
-    as 'Pending' -- this is the record an Approver will later act on.
-    The AI verdict is captured here, in the DB, so it can never be spoofed
-    later at approval time.
-    """
     classification = classify_sql(payload.sql_text)
     if classification["type"] == "UNKNOWN":
         raise HTTPException(status_code=400, detail=f"Cannot submit: {classification['reason']}")
@@ -42,6 +37,17 @@ def create_submission(
         submitted_by_id=current_user.id,
     )
     db.add(submission)
+    db.flush()  # get submission.id before commit, for the audit log
+
+    log_action(
+        db,
+        action="SUBMISSION_CREATED",
+        actor_id=current_user.id,
+        target_type="Submission",
+        target_id=submission.id,
+        details={"sql_type": submission.sql_type, "ai_verdict": submission.ai_verdict},
+    )
+
     db.commit()
     db.refresh(submission)
     return submission
@@ -53,10 +59,6 @@ def list_submissions(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    """
-    Approvers/Admins see everything. Developers see only their own submissions.
-    Optional ?status=Pending filter -- this is your deployment queue view.
-    """
     query = db.query(models.Submission)
 
     if current_user.role not in (models.RoleEnum.approver, models.RoleEnum.admin):
@@ -93,11 +95,6 @@ def approve_submission(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_role("Approver", "Admin")),
 ):
-    """
-    The manual gate. sql_text and ai_verdict are read from the STORED submission,
-    never from the request body -- the client cannot influence what gets executed
-    beyond the confirmed=true click itself.
-    """
     if not payload.confirmed:
         raise HTTPException(status_code=400, detail="Approval requires confirmed=true")
 
@@ -118,12 +115,20 @@ def approve_submission(
         result = execute_ddl(submission.sql_text, UAT_DB_URL)
         submission.execution_result = result
     else:
-        # DML -- app NEVER executes this, only marks it approved for manual execution
         submission.execution_result = {"status": "not_executed", "reason": "DML requires manual execution"}
 
     submission.status = models.SubmissionStatus.approved
     submission.reviewed_by_id = current_user.id
     submission.reviewed_at = datetime.now(timezone.utc)
+
+    log_action(
+        db,
+        action="SUBMISSION_APPROVED",
+        actor_id=current_user.id,
+        target_type="Submission",
+        target_id=submission.id,
+        details={"sql_type": submission.sql_type, "execution_result": submission.execution_result},
+    )
 
     db.commit()
     db.refresh(submission)
@@ -137,7 +142,6 @@ def reject_submission(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_role("Approver", "Admin")),
 ):
-    """Sends the submission back to the developer with a reason."""
     submission = db.query(models.Submission).filter(models.Submission.id == submission_id).first()
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
@@ -148,6 +152,15 @@ def reject_submission(
     submission.reject_reason = payload.reason
     submission.reviewed_by_id = current_user.id
     submission.reviewed_at = datetime.now(timezone.utc)
+
+    log_action(
+        db,
+        action="SUBMISSION_REJECTED",
+        actor_id=current_user.id,
+        target_type="Submission",
+        target_id=submission.id,
+        details={"reason": payload.reason},
+    )
 
     db.commit()
     db.refresh(submission)

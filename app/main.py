@@ -11,6 +11,7 @@ from app.services.classifier import classify_sql
 from app.routers import submissions
 from app.routers import admin
 from app.routers import login
+from app.routers import audit_router
  
 app = FastAPI(title="SQL Deploy Gate", version="0.1.0")
 
@@ -20,7 +21,7 @@ app.include_router(sql_review.router)
 app.include_router(submissions.router)
 app.include_router(login.router)
 app.include_router(admin.router)
-
+app.include_router(audit_router.router)
 class SQLSubmission(BaseModel):
     sql_text: str
 
