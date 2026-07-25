@@ -29,6 +29,22 @@ class SubmissionStatus(str, enum.Enum):
     approved = "Approved"
     rejected = "Rejected"
 
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+ 
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+ 
+    actor_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # null for system/pre-login events
+    action = Column(String, nullable=False, index=True)                # e.g. "SUBMISSION_APPROVED"
+    target_type = Column(String, nullable=True, index=True)             # e.g. "Submission", "User"
+    target_id = Column(Integer, nullable=True, index=True)
+ 
+    details = Column(JSON, nullable=True)   # free-form extra context, e.g. {"role": "Approver"}
+ 
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+ 
+    actor = relationship("User", foreign_keys=[actor_id])
+
 
 class Submission(Base):
     __tablename__ = "submissions"

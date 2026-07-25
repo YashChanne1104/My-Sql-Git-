@@ -77,3 +77,15 @@ class ApproveRequest(BaseModel):
 
 class RejectRequest(BaseModel):
     reason: str = Field(..., min_length=1, description="Why this submission is being sent back")
+
+class AuditLogOut(BaseModel):
+    id: int
+    actor_id: int | None
+    action: str
+    target_type: str | None
+    target_id: int | None
+    details: dict | None
+    created_at: datetime
+ 
+    class Config:
+        from_attributes = True  
