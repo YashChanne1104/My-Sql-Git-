@@ -9,6 +9,7 @@ from ..models import models, schemas
 from ..services.classifier import classify_sql
 from ..services.executor import execute_ddl
 from ..services.audit import log_action
+from ..services.sql_cleaner import extract_target_database, clean_sql_script, swap_database_in_url
 from ..routers.sql_review import run_sql_review
 
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
@@ -20,16 +21,28 @@ def create_submission(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user),
 ):
-    classification = classify_sql(payload.sql_text)
+    """
+    Cleans SSMS boilerplate (USE/GO/SET ANSI_NULLS etc.) before anything else --
+    classification, AI review, and storage all operate on the CLEANED script,
+    which becomes the single source of truth going forward. The database name
+    from any USE statement is captured separately in target_database, so the
+    right database gets targeted at execution time even though USE itself is
+    stripped from the executable text.
+    """
+    target_db = extract_target_database(payload.sql_text)
+    cleaned_sql = clean_sql_script(payload.sql_text)
+
+    classification = classify_sql(cleaned_sql)
     if classification["type"] == "UNKNOWN":
         raise HTTPException(status_code=400, detail=f"Cannot submit: {classification['reason']}")
 
-    review = run_sql_review(payload.sql_text)
+    review = run_sql_review(cleaned_sql)
 
     submission = models.Submission(
-        sql_text=payload.sql_text,
+        sql_text=cleaned_sql,
         sql_type=classification["type"],
         object_type=classification.get("object_type"),
+        target_database=target_db,
         ai_verdict=review.verdict,
         ai_summary=review.summary,
         ai_review_json=review.model_dump(),
@@ -45,7 +58,11 @@ def create_submission(
         actor_id=current_user.id,
         target_type="Submission",
         target_id=submission.id,
-        details={"sql_type": submission.sql_type, "ai_verdict": submission.ai_verdict},
+        details={
+            "sql_type": submission.sql_type,
+            "ai_verdict": submission.ai_verdict,
+            "target_database": target_db,
+        },
     )
 
     db.commit()
@@ -95,6 +112,12 @@ def approve_submission(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_role("Approver", "Admin")),
 ):
+    """
+    The manual gate. sql_text, ai_verdict, and target_database are all read
+    from the STORED submission -- never from the request body -- so the
+    client cannot influence what gets executed, or where, beyond the
+    confirmed=true click itself.
+    """
     if not payload.confirmed:
         raise HTTPException(status_code=400, detail="Approval requires confirmed=true")
 
@@ -112,9 +135,14 @@ def approve_submission(
         )
 
     if submission.sql_type == "DDL":
-        result = execute_ddl(submission.sql_text, UAT_DB_URL)
+        exec_url = UAT_DB_URL
+        if submission.target_database:
+            exec_url = swap_database_in_url(UAT_DB_URL, submission.target_database)
+
+        result = execute_ddl(submission.sql_text, exec_url)
         submission.execution_result = result
     else:
+        # DML -- app NEVER executes this, only marks it approved for manual execution
         submission.execution_result = {"status": "not_executed", "reason": "DML requires manual execution"}
 
     submission.status = models.SubmissionStatus.approved
@@ -127,7 +155,11 @@ def approve_submission(
         actor_id=current_user.id,
         target_type="Submission",
         target_id=submission.id,
-        details={"sql_type": submission.sql_type, "execution_result": submission.execution_result},
+        details={
+            "sql_type": submission.sql_type,
+            "target_database": submission.target_database,
+            "execution_result": submission.execution_result,
+        },
     )
 
     db.commit()
@@ -142,6 +174,7 @@ def reject_submission(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.require_role("Approver", "Admin")),
 ):
+    """Sends the submission back to the developer with a reason."""
     submission = db.query(models.Submission).filter(models.Submission.id == submission_id).first()
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")

@@ -63,6 +63,7 @@ class SubmissionOut(BaseModel):
     execution_result: dict | None
     created_at: datetime
     reviewed_at: datetime | None
+    target_database: str | None  # <-- NEW
 
     class Config:
         from_attributes = True

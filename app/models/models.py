@@ -73,3 +73,5 @@ class Submission(Base):
 
     submitted_by = relationship("User", foreign_keys=[submitted_by_id])
     reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
+    
+    target_database = Column(String, nullable=True)  # e.g. "ETransReporting", from USE statement
