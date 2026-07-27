@@ -3,10 +3,4 @@ __pycache__/
 .env
 *.pyc
 .env
-
-
-# Database
-app.db
 *.db
-*.sqlite
-*.sqlite3
