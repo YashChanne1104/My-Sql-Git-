@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,3 +21,8 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 
 settings = Settings()
+
+
+
+FILE_PATH = Path(os.getenv("FILE_PATH", r"C:\DML SP"))
+

@@ -90,3 +90,17 @@ class AuditLogOut(BaseModel):
  
     class Config:
         from_attributes = True  
+
+class BulkRejectRequest(BaseModel):
+    submission_ids: list[int] = Field(..., min_items=1, description="List of submission IDs to reject")
+    reason: str = Field(..., min_length=1, description="Reason for rejection")
+
+class BulkActionResult(BaseModel):
+    approved: list[int] = Field(default_factory=list)
+    rejected: list[int] = Field(default_factory=list)
+    failed: dict[int, str] = Field(default_factory=dict)
+    combined_file: str | None = None
+
+class BulkApproveRequest(BaseModel):
+    submission_ids: list[int] = Field(..., min_items=1, description="List of submission IDs to approve")
+    confirmed: bool = Field(..., description="Must be explicitly true")
