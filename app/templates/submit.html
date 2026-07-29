@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Submit SQL — SQL Deploy Gate{% endblock %}
+{% block content %}
+<div style="max-width: 720px; margin: 0 auto; padding: 48px 24px 80px; position: relative; z-index: 1;">
+
+    <h1 style="font-family: var(--mono); font-size: 24px; margin: 0 0 6px 0;">Submit SQL for review</h1>
+    <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 32px 0;">
+        Paste directly from SSMS — headers, comments, and boilerplate are cleaned automatically.
+    </p>
+
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+    <div class="auth-card" style="max-width: none; margin-bottom: 28px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <h2 style="font-family: var(--mono); font-size: 16px; margin: 0;">Submission #{{ result.id }}</h2>
+            <span class="status-pill status-{{ result.status.lower() }}">{{ result.status }}</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; font-size: 13px;">
+            <div>
+                <div style="color: var(--text-muted); margin-bottom: 4px;">Type</div>
+                <div style="font-family: var(--mono);">{{ result.sql_type }}{% if result.object_type %} / {{
+                    result.object_type }}{% endif %}</div>
+            </div>
+            <div>
+                <div style="color: var(--text-muted); margin-bottom: 4px;">AI Verdict</div>
+                <div style="font-family: var(--mono);" class="verdict-{{ result.ai_verdict }}">
+                    {{ result.ai_verdict }}
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 4px; color: var(--text-muted); font-size: 13px;">AI Summary</div>
+        <p style="font-size: 14px; line-height: 1.6; margin: 0;">{{ result.ai_summary }}</p>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/ui/submit">
+        <div class="field">
+            <label for="sql_text">SQL Script</label>
+            <textarea id="sql_text" name="sql_text" required rows="14"
+                placeholder="CREATE OR ALTER PROCEDURE dbo.YourProcedure AS BEGIN ... END"
+                style="width: 100%; padding: 14px; background: #14161B; border: 1px solid var(--panel-border); border-radius: 8px; color: var(--text); font-family: var(--mono); font-size: 13px; line-height: 1.6; resize: vertical;">{{ sql_text or '' }}</textarea>
+        </div>
+        <button type="submit" class="btn" style="width: auto; padding: 12px 32px;">Submit for review</button>
+    </form>
+
+</div>
+{% endblock %}

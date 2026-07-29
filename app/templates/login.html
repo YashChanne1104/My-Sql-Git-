@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Log in — SQL Deploy Gate{% endblock %}
+{% block content %}
+<div class="center-wrap">
+    <div class="auth-card">
+        <h1>Log in</h1>
+        <p class="subtitle">Sign in to review or submit SQL changes.</p>
+
+        {% if error %}
+        <div class="error-box">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/ui/login">
+            <div class="field">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required autofocus value="{{ email or '' }}">
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn">Log in</button>
+        </form>
+
+        <div class="auth-footer">
+            Don't have an account? <a href="/ui/signup">Sign up</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
