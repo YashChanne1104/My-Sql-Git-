@@ -1,4 +1,3 @@
-from app.services.dml_file_manager import append_to_pending_file
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -7,14 +6,11 @@ from ..core.database import get_db
 from ..core import auth
 from ..core.config import UAT_DB_URL
 from ..models import models, schemas
-from ..services.classifier import classify_sql
 from ..services.executor import execute_ddl
 from ..services.audit import log_action
-from ..services.sql_cleaner import extract_target_database, clean_sql_script, swap_database_in_url
-from ..routers.sql_review import run_sql_review
-from ..services.dml_validator import validate_dml_syntax
-from ..services.dml_file_manager import write_approved_file,remove_from_pending_file
-from ..services.dml_file_manager import append_to_pending_file,write_approved_file_bulk
+from ..services.sql_cleaner import swap_database_in_url
+from ..services.dml_file_manager import write_approved_file, remove_from_pending_file, write_approved_file_bulk
+from ..services.submission_service import create_submission_record
 
 router = APIRouter(prefix="/submissions", tags=["Submissions"])
 
@@ -26,60 +22,12 @@ def create_submission(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     """
-    Cleans SSMS boilerplate (USE/GO/SET ANSI_NULLS etc.) before anything else --
-    classification, AI review, and storage all operate on the CLEANED script,
-    which becomes the single source of truth going forward. The database name
-    from any USE statement is captured separately in target_database, so the
-    right database gets targeted at execution time even though USE itself is
-    stripped from the executable text.
+    All the actual logic (cleaning, classifying, DML syntax validation, AI
+    review, saving, file archiving) lives in create_submission_record --
+    shared with the /ui/submit browser page so there's exactly one
+    implementation, not two that could drift apart.
     """
-    target_db = extract_target_database(payload.sql_text)
-    cleaned_sql = clean_sql_script(payload.sql_text)
-
-    classification = classify_sql(cleaned_sql)
-    if classification["type"] == "UNKNOWN":
-        raise HTTPException(status_code=400, detail=f"Cannot submit: {classification['reason']}")
-    if classification["type"] == "DML":
-        syntax_check = validate_dml_syntax(cleaned_sql, classification["keyword"])
-        if not syntax_check["valid"]:
-            raise HTTPException(status_code=400, detail=f"Invalid DML syntax: {syntax_check['reason']}")
-
-    review = run_sql_review(cleaned_sql)
-
-    submission = models.Submission(
-        sql_text=cleaned_sql,
-        sql_type=classification["type"],
-        object_type=classification.get("object_type"),
-        target_database=target_db,
-        ai_verdict=review.verdict,
-        ai_summary=review.summary,
-        ai_review_json=review.model_dump(),
-        status=models.SubmissionStatus.pending,
-        submitted_by_id=current_user.id,
-    )
-    db.add(submission)
-    db.flush()  # get submission.id before commit, for the audit log
-
-    log_action(
-        db,
-        action="SUBMISSION_CREATED",
-        actor_id=current_user.id,
-        target_type="Submission",
-        target_id=submission.id,
-        details={
-            "sql_type": submission.sql_type,
-            "ai_verdict": submission.ai_verdict,
-            "target_database": target_db,
-        },
-    )
-
-    db.commit()
-    db.refresh(submission)
-
-    if submission.sql_type == "DML":
-        append_to_pending_file(submission.id, submission.sql_text, current_user.email)
-
-    return submission
+    return create_submission_record(db, current_user, payload.sql_text)
 
 
 @router.get("", response_model=list[schemas.SubmissionOut])
@@ -212,6 +160,7 @@ def reject_submission(
     db.commit()
     db.refresh(submission)
     return submission
+
 
 @router.post("/bulk-approve", response_model=schemas.BulkActionResult)
 def bulk_approve_submissions(

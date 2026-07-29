@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}SQL Deploy Gate{% endblock %}
+{% block content %}
+<div class="hero">
+    <div class="eyebrow">Internal Tooling</div>
+    <h1>Ship SQL changes with<br>a gate, not a guess.</h1>
+    <p class="lede">
+        Every stored procedure, function, trigger, and data change gets classified,
+        AI-reviewed, and held for human approval — before it ever touches UAT.
+    </p>
+    <div class="cta-row">
+        {% if current_user %}
+        <a href="/ui/login" class="btn"
+            style="width: auto; padding: 12px 28px; text-decoration: none; display: inline-block;">Go to dashboard</a>
+        {% else %}
+        <a href="/ui/login" class="btn"
+            style="width: auto; padding: 12px 28px; text-decoration: none; display: inline-block;">Log in</a>
+        <a href="/ui/signup" class="btn btn-secondary"
+            style="width: auto; padding: 12px 28px; text-decoration: none; display: inline-block;">Sign up</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="pipeline">
+    <div class="step">
+        <div class="num">01</div>
+        <h3>Submit</h3>
+        <p>Paste SQL straight from SSMS — boilerplate is cleaned automatically.</p>
+    </div>
+    <div class="step">
+        <div class="num">02</div>
+        <h3>AI Review</h3>
+        <p>Checked for safety, performance, and naming issues before a human sees it.</p>
+    </div>
+    <div class="step">
+        <div class="num">03</div>
+        <h3>Approve</h3>
+        <p>A human always makes the final call — the AI verdict alone can't deploy anything.</p>
+    </div>
+    <div class="step">
+        <div class="num">04</div>
+        <h3>Deploy</h3>
+        <p>DDL auto-executes on the right database. DML is handed off for manual execution.</p>
+    </div>
+</div>
+{% endblock %}
