@@ -12,10 +12,20 @@ from app.routers import submissions
 from app.routers import admin
 from app.routers import login
 from app.routers import audit_router
- 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="SQL Deploy Gate", version="0.1.0")
 
-Base.metadata.create_all(bind=engine)   # <-- must run AFTER the imports above
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:5500", "http://localhost:5500"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+Base.metadata.create_all(bind=engine)
 
 app.include_router(sql_review.router)
 app.include_router(submissions.router)
