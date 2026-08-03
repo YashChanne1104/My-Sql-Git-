@@ -79,17 +79,25 @@ class ApproveRequest(BaseModel):
 class RejectRequest(BaseModel):
     reason: str = Field(..., min_length=1, description="Why this submission is being sent back")
 
-class AuditLogOut(BaseModel):
+class AuditSummaryOut(BaseModel):
     id: int
-    actor_id: int | None
-    action: str
-    target_type: str | None
-    target_id: int | None
-    details: dict | None
-    created_at: datetime
- 
+
+    user: str | None           # who raised it
+    type: str                  # DDL or DML
+    query_summary: str | None  # what the SQL actually does (AI-generated)
+
+    ai_verdict: str            # approved / needs_changes
+
+    status: SubmissionStatus   # Pending / Approved / Rejected
+    approved_by: str | None    # who reviewed it (approved OR rejected)
+    approved_at: datetime | None
+    reject_reason: str | None
+
+    raised_at: datetime
+    target_database: str | None
+
     class Config:
-        from_attributes = True  
+        from_attributes = True
 
 class BulkRejectRequest(BaseModel):
     submission_ids: list[int] = Field(..., min_items=1, description="List of submission IDs to reject")

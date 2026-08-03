@@ -29,20 +29,21 @@ class SubmissionStatus(str, enum.Enum):
     approved = "Approved"
     rejected = "Rejected"
 
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
- 
+
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
- 
+
     actor_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # null for system/pre-login events
     action = Column(String, nullable=False, index=True)                # e.g. "SUBMISSION_APPROVED"
     target_type = Column(String, nullable=True, index=True)             # e.g. "Submission", "User"
     target_id = Column(Integer, nullable=True, index=True)
- 
+
     details = Column(JSON, nullable=True)   # free-form extra context, e.g. {"role": "Approver"}
- 
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
- 
+
     actor = relationship("User", foreign_keys=[actor_id])
 
 
@@ -71,7 +72,36 @@ class Submission(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
+    target_database = Column(String, nullable=True)  # e.g. "ETransReporting", from USE statement
+    query_summary = Column(Text, nullable=True)  # plain-English: what does this SQL actually DO
+
     submitted_by = relationship("User", foreign_keys=[submitted_by_id])
     reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
-    
-    target_database = Column(String, nullable=True)  # e.g. "ETransReporting", from USE statement
+
+    @property
+    def submitted_by_email(self) -> str | None:
+        return self.submitted_by.email if self.submitted_by else None
+
+    @property
+    def reviewed_by_email(self) -> str | None:
+        return self.reviewed_by.email if self.reviewed_by else None
+
+    @property
+    def summary_text(self) -> str:
+        """Plain-English, one-line summary of this submission's history."""
+        raised = f"{self.sql_type} submitted by {self.submitted_by_email or 'unknown'} on {self.created_at.strftime('%d %b, %H:%M')}"
+
+        if self.status.value == "Pending":
+            return f"{raised} — awaiting review."
+
+        reviewer = self.reviewed_by_email or "unknown"
+        when = self.reviewed_at.strftime('%d %b, %H:%M') if self.reviewed_at else "unknown time"
+
+        if self.status.value == "Approved":
+            return f"{raised} — approved by {reviewer} on {when}."
+
+        if self.status.value == "Rejected":
+            reason = f': "{self.reject_reason}"' if self.reject_reason else "."
+            return f"{raised} — rejected by {reviewer} on {when}{reason}"
+
+        return raised
