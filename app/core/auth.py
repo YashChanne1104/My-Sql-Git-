@@ -35,6 +35,21 @@ def authenticate_user(db: Session, email: str, password: str):
         return None
     return user
 
+def create_user(db: Session, email: str, password: str) -> models.User:
+    existing = db.query(models.User).filter(models.User.email == email).first()
+    if existing:
+        raise ValueError("Email already registered")
+
+    hashed_password = pwd_context.hash(password)
+    new_user = models.User(
+        email=email,
+        hashed_password=hashed_password,
+        role=models.RoleEnum.developer,  # signup.html already tells users this is the default
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -69,6 +84,8 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
 
 
 def require_role(*allowed_roles: str):
