@@ -67,6 +67,7 @@ class SubmissionOut(BaseModel):
     target_database: str | None  # <-- NEW
     optional_suggestions: list[str] = []
     suggested_sql: str | None = None
+    
 
     class Config:
         from_attributes = True

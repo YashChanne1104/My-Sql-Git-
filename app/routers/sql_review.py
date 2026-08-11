@@ -74,6 +74,7 @@ class SQLReviewReport(BaseModel):
 structured_model = model.with_structured_output(SQLReviewReport)
 
 
+
 # ===========================
 # Core review logic (reusable, not tied to the HTTP layer)
 # ===========================
