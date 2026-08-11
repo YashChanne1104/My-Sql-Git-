@@ -1,4 +1,5 @@
 from datetime import datetime
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, EmailStr, Field
 
 from .models import RoleEnum, SubmissionStatus
@@ -64,6 +65,9 @@ class SubmissionOut(BaseModel):
     created_at: datetime
     reviewed_at: datetime | None
     target_database: str | None  # <-- NEW
+    optional_suggestions: list[str] = []
+    suggested_sql: str | None = None
+    
 
     class Config:
         from_attributes = True
