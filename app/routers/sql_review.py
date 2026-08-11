@@ -1,9 +1,13 @@
 from typing import Literal, Optional
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, HTTPException
+# pyrefly: ignore [missing-import]
 from langchain_core.prompts import ChatPromptTemplate
 # pyrefly: ignore [missing-import]
 from langchain_mistralai import ChatMistralAI
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from ..services.classifier import classify_sql
 
@@ -52,12 +56,20 @@ class SQLReviewReport(BaseModel):
         default_factory=list,
         description="e.g. missing schema prefix, inconsistent casing, unclear names"
     )
+    optional_suggestions: list[str] = Field(
+        default_factory=list,
+        description="Nice-to-have improvements that don't block approval, e.g. "
+                     "adding an index hint, adding a comment header, minor readability tweaks. "
+                     "Populate this even when verdict is 'approved'."
+    )
     summary: str = Field(description="2-3 sentence plain-English summary for the human approver")
     suggested_sql: Optional[str] = Field(
-        default=None, description="Corrected/improved SQL, only if real issues were found"
+        default=None,
+        description="Corrected SQL if safety/performance/naming issues were found. "
+                     "If the script is clean but optional_suggestions exist, provide an "
+                     "improved version here anyway (verdict stays 'approved'). "
+                     "Null only if there is truly nothing to improve."
     )
-
-
 # Structured Output
 structured_model = model.with_structured_output(SQLReviewReport)
 
@@ -88,8 +100,14 @@ def run_sql_review(sql_text: str) -> SQLReviewReport:
         2. PERFORMANCE -- cursors that could be set-based, SELECT *, missing WHERE/JOIN
            index consideration, non-sargable predicates.
         3. NAMING CONVENTIONS -- schema prefixes (dbo.), consistent casing, clear names.
-        4. Provide a corrected/improved version in suggested_sql ONLY if you found real
-           issues. If the script is already clean, leave suggested_sql null.
+        4. OPTIONAL IMPROVEMENTS -- add these to optional_suggestions even if the script
+           is otherwise clean. Examples: adding an index hint when appropriate, adding
+           a comment header, minor readability tweaks, suggesting more specific column
+           lists instead of SELECT *.
+        5. Provide a corrected/improved version in suggested_sql ONLY if safety/performance/
+           naming issues were found. If the script is clean but optional_suggestions exist,
+           provide an improved version here anyway (verdict stays 'approved').
+           Null only if there is truly nothing to improve.
 
         Be direct and specific -- reference actual column/table names from the script,
         not generic advice. Return ONLY the structured response.
