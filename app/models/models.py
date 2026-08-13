@@ -78,6 +78,9 @@ class Submission(Base):
     submitted_by = relationship("User", foreign_keys=[submitted_by_id])
     reviewed_by = relationship("User", foreign_keys=[reviewed_by_id])
 
+    optional_suggestions = Column(JSON, nullable=True)
+    suggested_sql = Column(Text, nullable=True)
+
     @property
     def submitted_by_email(self) -> str | None:
         return self.submitted_by.email if self.submitted_by else None
