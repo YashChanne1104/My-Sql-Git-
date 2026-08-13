@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
+# pyrefly: ignore [missing-import]
 from fastapi import HTTPException
 
 from ..models import models
@@ -21,6 +23,7 @@ def create_submission_record(db: Session, current_user: models.User, raw_sql_tex
     target_db = extract_target_database(raw_sql_text)
     cleaned_sql = clean_sql_script(raw_sql_text)
 
+    # Classify on the cleaned SQL (used for storage/execution/validation below)
     classification = classify_sql(cleaned_sql)
     if classification["type"] == "UNKNOWN":
         raise HTTPException(status_code=400, detail=f"Cannot submit: {classification['reason']}")
@@ -30,7 +33,9 @@ def create_submission_record(db: Session, current_user: models.User, raw_sql_tex
         if not syntax_check["valid"]:
             raise HTTPException(status_code=400, detail=f"Invalid DML syntax: {syntax_check['reason']}")
 
-    review = run_sql_review(cleaned_sql)
+    # Review the RAW sql_text -- matches what /review-sql shows the user,
+    # since that endpoint reviews raw_sql_text with no cleaning applied.
+    review = run_sql_review(raw_sql_text)
     query_summary = generate_query_summary(cleaned_sql, classification["type"])
 
     submission = models.Submission(
@@ -42,6 +47,8 @@ def create_submission_record(db: Session, current_user: models.User, raw_sql_tex
         ai_verdict=review.verdict,
         ai_summary=review.summary,
         ai_review_json=review.model_dump(),
+        optional_suggestions=review.optional_suggestions,
+        suggested_sql=review.suggested_sql,
         status=models.SubmissionStatus.pending,
         submitted_by_id=current_user.id,
     )
