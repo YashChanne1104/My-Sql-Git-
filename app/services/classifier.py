@@ -4,6 +4,8 @@ import sqlparse
 from sqlparse.sql import Statement, Comment
 from enum import Enum
 
+from .sql_cleaner import strip_for_classification
+
 
 class SQLType(str, Enum):
     DDL = "DDL"
@@ -20,14 +22,13 @@ def classify_sql(sql_text: str) -> dict:
     """
     Classifies a SQL script as DDL or DML based on its first meaningful statement.
 
-    Comments are skipped two ways because sqlparse represents them two ways:
-    - single tokens tagged with ttype Comment.Single / Comment.Multiline
-    - GROUPED runs of consecutive comment lines as a sqlparse.sql.Comment
-      object, which has ttype=None (it's a TokenList, not a plain Token) --
-      checking only ttype misses this second form entirely, letting a whole
-      header comment block slip through as if it were the first real token.
+    sql_text is regex-stripped of comments/USE/GO/SET boilerplate via
+    strip_for_classification() first, so callers can pass either raw or
+    cleaned SQL and still get a correct classification. The sqlparse-level
+    comment filtering below is kept as a second layer of defense, not the
+    primary mechanism.
     """
-    sql_text = sql_text.strip()
+    sql_text = strip_for_classification(sql_text).strip()
     if not sql_text:
         return {"type": SQLType.UNKNOWN, "keyword": None, "object_type": None, "reason": "Empty input"}
 
@@ -78,26 +79,3 @@ def classify_sql(sql_text: str) -> dict:
         "object_type": None,
         "reason": f"'{first_keyword}' is not a recognized DDL or DML starting keyword"
     }
-
-
-if __name__ == "__main__":
-    test_cases = [
-        # This is the exact case that was failing -- grouped comment block before CREATE
-        """/****** Object:  StoredProcedure [dbo].[usp_GetFTLGCReport] ******/
--- =============================================
--- Author     : SURAJ PATIL
--- Create date: 09/01/2024
--- =============================================
-Create PROCEDURE [dbo].[test_Changes]
-AS
-BEGIN
-    SELECT 1
-END""",
-        "CREATE OR ALTER PROCEDURE dbo.GetActiveOrders AS BEGIN SELECT 1 END",
-        "UPDATE Orders SET Status = 'Shipped' WHERE OrderId = 5001",
-        "SELECT * FROM Orders",
-    ]
-
-    for sql in test_cases:
-        result = classify_sql(sql)
-        print(f"[{result['type'].value:>7}] {result['reason']}")

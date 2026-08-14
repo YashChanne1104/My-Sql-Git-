@@ -58,3 +58,36 @@ def swap_database_in_url(db_url: str, new_database: str) -> str:
     return f"{prefix}/{new_database}{suffix}"
 
 
+_BLOCK_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", re.DOTALL)
+_LINE_COMMENT_PATTERN = re.compile(r"--[^\n]*")
+_GO_LINE_PATTERN = re.compile(r"^\s*GO\s*$", re.IGNORECASE | re.MULTILINE)
+_USE_LINE_PATTERN = re.compile(r"^\s*USE\s+.+$", re.IGNORECASE | re.MULTILINE)
+_SET_ON_OFF_LINE_PATTERN = re.compile(r"^\s*SET\s+\w+\s+(ON|OFF)\s*$", re.IGNORECASE | re.MULTILINE)
+
+
+def strip_for_classification(sql_text: str) -> str:
+    """
+    Produces a classification-only view of the SQL: strips block comments,
+    line comments, USE statements, GO separators, and SET ON/OFF lines.
+
+    This exists because sqlparse's comment grouping is sensitive to
+    surrounding whitespace -- after clean_sql_script removes GO/USE/SET
+    lines it can leave blank lines that cause sqlparse to NOT group
+    consecutive '--' divider lines as a single Comment object, letting
+    something like '-- ====================' slip through as if it were
+    the first real token. Stripping with regex first sidesteps that
+    entirely, regardless of SSMS header boilerplate shape.
+
+    Does NOT touch the original sql_text used for storage, review, or
+    execution -- this is purely a classification input.
+    """
+    text = _BLOCK_COMMENT_PATTERN.sub("", sql_text)
+    text = _LINE_COMMENT_PATTERN.sub("", text)
+    text = _GO_LINE_PATTERN.sub("", text)
+    text = _USE_LINE_PATTERN.sub("", text)
+    text = _SET_ON_OFF_LINE_PATTERN.sub("", text)
+
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    return "\n".join(lines).strip()
+
+
