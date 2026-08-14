@@ -127,8 +127,14 @@ def run_sql_review(sql_text: str) -> SQLReviewReport:
     report: SQLReviewReport = structured_model.invoke(messages)
     report.sql_type = classification["type"]
     report.object_type = classification.get("object_type")
-    return report
 
+    # Feature: on approval, don't surface optional suggestions or a
+    # suggested rewrite -- those are only useful when changes are required.
+    if report.verdict == "approved":
+        report.optional_suggestions = []
+        report.suggested_sql = None
+
+    return report
 
 # ===========================
 # API Endpoint

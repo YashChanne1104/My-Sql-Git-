@@ -38,6 +38,11 @@ def create_submission_record(db: Session, current_user: models.User, raw_sql_tex
     review = run_sql_review(raw_sql_text)
     query_summary = generate_query_summary(cleaned_sql, classification["type"])
 
+    # Auto-reject immediately if the AI flagged issues -- never let a
+    # 'needs_changes' submission sit in the approval queue for a human
+    # to review or approve.
+    auto_rejected = review.verdict == "needs_changes"
+
     submission = models.Submission(
         sql_text=cleaned_sql,
         sql_type=classification["type"],
@@ -49,14 +54,17 @@ def create_submission_record(db: Session, current_user: models.User, raw_sql_tex
         ai_review_json=review.model_dump(),
         optional_suggestions=review.optional_suggestions,
         suggested_sql=review.suggested_sql,
-        status=models.SubmissionStatus.pending,
+        status=models.SubmissionStatus.rejected if auto_rejected else models.SubmissionStatus.pending,
+        reject_reason=f"Auto-rejected by AI review: {review.summary}" if auto_rejected else None,
         submitted_by_id=current_user.id,
     )
     db.add(submission)
     db.flush()
 
     log_action(
-        db, action="SUBMISSION_CREATED", actor_id=current_user.id,
+        db,
+        action="SUBMISSION_AUTO_REJECTED" if auto_rejected else "SUBMISSION_CREATED",
+        actor_id=current_user.id,
         target_type="Submission", target_id=submission.id,
         details={"sql_type": submission.sql_type, "ai_verdict": submission.ai_verdict, "target_database": target_db},
     )
@@ -64,7 +72,8 @@ def create_submission_record(db: Session, current_user: models.User, raw_sql_tex
     db.commit()
     db.refresh(submission)
 
-    if submission.sql_type == "DML":
+    # Only append to the pending DML file if it actually needs human approval.
+    if submission.sql_type == "DML" and not auto_rejected:
         append_to_pending_file(submission.id, submission.sql_text, current_user.email)
 
     return submission
