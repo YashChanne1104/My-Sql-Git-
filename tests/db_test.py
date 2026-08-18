@@ -1,15 +1,8 @@
-from dotenv import load_dotenv
 import os
-from sqlalchemy import create_engine
+# pyrefly: ignore [missing-import]
+from dotenv import load_dotenv
 
 load_dotenv()
 
-
-def check_db_connection(db_url: str, name: str) -> str:
-    engine = create_engine(db_url)
-    try:
-        with engine.connect():
-            return f"{name}: Database connection successful"
-    except Exception as e:
-        return f"{name}: Database connection failed: {e}"
-
+print("DATABASE_URL:", os.getenv("DATABASE_URL"))
+print("SECRET_KEY:", os.getenv("SECRET_KEY"))
