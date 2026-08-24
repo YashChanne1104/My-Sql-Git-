@@ -10,10 +10,8 @@ if settings.DATABASE_URL.startswith("sqlite"):
 engine = create_engine(
     settings.DATABASE_URL,
     connect_args=connect_args,
-    pool_pre_ping=True,
-    fast_executemany=True,  # speeds up pyodbc bulk inserts
+    pool_pre_ping=True,  # important for Neon: avoids stale-connection errors after scale-to-zero
 )
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
