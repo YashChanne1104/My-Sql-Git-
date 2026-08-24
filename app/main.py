@@ -22,7 +22,7 @@ app = FastAPI(title="SQL Deploy Gate", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://sqlgate.onrender.com/"],
+    allow_origins=["https://sqlgate.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
