@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
  
 from .core.config import DEV_DB_URL, UAT_DB_URL
@@ -12,6 +14,7 @@ from app.routers import submissions
 from app.routers import admin
 from app.routers import login
 from app.routers import audit_router
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="SQL Deploy Gate", version="0.1.0")
